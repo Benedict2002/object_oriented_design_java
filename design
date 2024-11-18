@@ -1,0 +1,647 @@
+Is Java “Pass by Reference”?
+Java handles objects “by reference,” but we must not confuse this with the phrase
+“pass by reference.” “Pass by reference” is a term used to describe the method-calling
+conventions of some programming languages. In a pass-by-reference language, val‐
+ues—even primitive values—are not passed directly to methods. Instead, methods
+are always passed references to values. Thus, if the method modifies its parameters,
+those modifications are visible when the method returns, even for primitive types.
+Java does not do this; it is a “pass-by-value” language. However, when a reference
+type is involved, the value that is passed is a copy of the reference (as a value). But
+this is not the same as pass by reference. If Java were a pass-by-reference language,
+when a reference type is passed to a method, it would be passed as a reference to the
+reference.
+
+
+The fact that Java is pass by value can be demonstrated very simply. The following
+code shows that even after the call to manipulate(), the value contained in variable
+c is unaltered—it is still holding a reference to a Circle object of radius 2. If Java
+was a pass-by-reference language, it would instead be holding a reference to a radius
+3 Circle:
+public void manipulate(Circle circle) {
+ circle = new Circle(3);
+}
+Circle c = new Circle(2);
+manipulate(c);
+System.out.println("Radius: "+ c.getRadius());v
+
+Important Methods of java.lang.Object
+
+
+A class that overrides important Object methods
+// This class represents a circle with immutable position and radius.
+public class Circle implements Comparable<Circle> {
+ // These fields hold the coordinates of the center and the radius.
+ // They are private for data encapsulation and final for immutability
+ private final int x, y, r;
+ // The basic constructor: initialize the fields to specified values
+ public Circle(int x, int y, int r) {
+ if (r < 0) throw new IllegalArgumentException("negative radius");
+ this.x = x; this.y = y; this.r = r;
+ }
+ // This is a "copy constructor"--a useful alternative to clone()
+ public Circle(Circle original) {
+ x = original.x; // Just copy the fields from the original
+ y = original.y;
+ r = original.r;
+ }
+ // Public accessor methods for the private fields.
+ // These are part of data encapsulation.
+ public int getX() { return x; }
+ public int getY() { return y; }
+ public int getR() { return r; }
+ // Return a string representation
+ @Override public String toString() {
+ return String.format("center=(%d,%d); radius=%d", x, y, r);
+ }
+ // Test for equality with another object
+ @Override public boolean equals(Object o) {
+ // Identical references?
+ if (o == this) return true;
+ // Correct type and non-null?
+ if (!(o instanceof Circle)) return false;
+ Circle that = (Circle) o; // Cast to our type
+ if (this.x == that.x && this.y == that.y && this.r == that.r)
+ return true; // If all fields match
+ else
+ return false; // If fields differ}
+ // A hash code allows an object to be used in a hash table.
+ // Equal objects must have equal hash codes. Unequal objects are
+ // allowed to have equal hash codes as well, but we try to avoid that.
+ // We must override this method because we also override equals().
+ @Override public int hashCode() {
+ int result = 17; // This hash code algorithm from the book
+ result = 37*result + x; // _Effective Java_, by Joshua Bloch
+ result = 37*result + y;
+ result = 37*result + r;
+ return result;
+ }
+ // This method is defined by the Comparable interface. Compare
+ // this Circle to that Circle. Return a value < 0 if this < that
+ // Return 0 if this == that. Return a value > 0 if this > that.
+ // Circles are ordered top to bottom, left to right, and then by radius
+ public int compareTo(Circle that) {
+ // Smaller circles have bigger y
+ long result = (long)that.y - this.y;
+ // If same compare l-to-r
+ if (result==0) result = (long)this.x - that.x;
+ // If same compare radius
+ if (result==0) result = (long)this.r - that.r;
+ // We have to use a long value for subtraction because the
+ // differences between a large positive and large negative
+ // value could overflow an int. But we can't return the long,
+ // so return its sign as an int.
+ return Long.signum(result);
+ }
+}
+
+hashCode()
+Whenever you override equals(), you must also override hashCode(). This method
+returns an integer for use by hash table data structures. It is critical that two objects
+have the same hash code if they are equal according to the equals() method. It is
+important (for efficient operation of hash tables) but not required that unequal
+objects have unequal hash codes, or at least that unequal objects are unlikely to
+share a hash code. This second criterion can lead to hashCode() methods that
+involve mildly tricky arithmetic or bit manipulation.
+The Object.hashCode() method works with the Object.equals() method and
+returns a hash code based on object identity rather than object equality. (If you ever
+need an identity-based hash code, you can access the functionality of Object.hash
+Code() through the static method System.identityHashCode().)
+NB: When you override equals(), you must always override hash
+Code() to guarantee that equal objects have equal hash codes.
+Failing to do this can cause subtle bugs in your programs.
+Comparable::compareTo()
+This method is defined by the
+java.lang.Comparable interface rather than by Object, but it is such a common
+method to implement that we include it in this section. The purpose of Comparable
+and its compareTo() method is to allow instances of a class to be compared to each
+other in the way that the <, <=, >, and >= operators compare numbers. If a class
+implements Comparable, we can say that one instance is less than, greater than, or
+equal to another instance. This also means that instances of a Comparable class can
+be sorted
+clone()
+Object defines a method named clone() whose purpose is to return an object with
+fields set identically to those of the current object
+
+
+Aspects of Object-Oriented Design
+We start by considering good practices for defining constants in Java, before moving
+on to discuss different approaches to using Java’s object-oriented capabilities for
+modeling and domain object design
+
+Constants
+A better approach is to define constants in a class and use the constants by typing
+the full class name and the constant name. You can save typing by importing the
+constants from their defining class with the import static declaration
+
+
+Interfaces Versus Abstract Classes
+The advent of Java 8 has fundamentally changed Java’s object-oriented program‐
+ming model. Before Java 8, interfaces were pure API specification and contained no
+implementation. This could often lead to duplication of code if the interface had
+many implementations.
+In response, a coding pattern developed. This pattern takes advantage of the fact
+that an abstract class does not need to be entirely abstract; it can contain a partial
+implementation that subclasses can take advantage of. In some cases, numerous
+subclasses can rely on method implementations provided by an abstract superclass.
+The pattern consists of an interface that contains the API spec for the basic meth‐
+ods, paired with a primary implementation as an abstract class. A good example
+would be java.util.List, which is paired with java.util.AbstractList. Two of
+the main implementations of List that ship with the JDK (ArrayList and Linked
+List) are subclasses of AbstractList. As another example:
+// Here is a basic interface. It represents a shape that fits inside
+// of a rectangular bounding box. Any class that wants to serve as a
+// RectangularShape can implement these methods from scratch.
+public interface RectangularShape {
+ void setSize(double width, double height);
+ void setPosition(double x, double y);
+ void translate(double dx, double dy);
+ double area();
+ boolean isInside();
+}
+// Here is a partial implementation of that interface. Many
+// implementations may find this a useful starting point.
+public abstract class AbstractRectangularShape
+ implements RectangularShape {
+ // The position and size of the shape
+ protected double x, y, w, h;
+ // Default implementations of some of the interface methods
+ public void setSize(double width, double height) {
+ w = width; h = height;
+ }
+ public void setPosition(double x, double y) {
+ this.x = x; this.y = y;
+ }
+ public void translate (double dx, double dy) { x += dx; y += dy; }
+}
+The arrival of default methods in Java 8 changes this picture considerably. Interfaces
+can now contain implementation code
+
+
+This means that when defining an abstract type (e.g., Shape) that you expect to have
+many subtypes (e.g., Circle, Rectangle, Square), you are faced with a choice
+between interfaces and abstract classes. Because they now have very similar features,
+it is not always clear which to use.
+Remember that a class that extends an abstract class cannot extend any other class,
+and that interfaces still cannot contain any nonconstant fields. This means that
+there are still some restrictions on how we can use object orientation in our Java
+programs.
+Another important difference between interfaces and abstract classes has to do with
+compatibility. If you define an interface as part of a public API and then later add a
+new mandatory method to the interface, you break any classes that implemented the
+previous version of the interface—in other words, any new interface methods must
+be declared as default and an implementation provided. If you use an abstract class,
+however, you can safely add nonabstract methods to that class without requiring
+modifications to existing classes that extend the abstract class.
+
+
+
+
+
+NB:In both cases, adding new methods can cause a clash with
+subclass methods of the same name and signature—with the
+subclass methods always winning. For this reason, think care‐
+fully when adding new methods—especially when the method
+names are “obvious” for this type, or where the method could
+have several possible meanings.
+In general, the suggested approach is to prefer interfaces when an API specification
+is needed. The mandatory methods of the interface are nondefault, as they represent
+the part of the API that must be present for an implementation to be considered
+valid. Default methods should be used only if a method is truly optional, or if they
+are really only intended to have a single possible implementation. This latter exam‐
+ple is the case for the functional composition present in java.util.function.Func
+tion—functions will only ever be composed in the standard way, and it is highly
+implausible that any sane override of the default compose() method could exist.
+Finally, the older technique of merely documenting which methods of an interface
+are considered “optional” and just throwing a java.lang.UnsupportedOperationEx
+ception if the programmer does not want to implement them is fraught with prob‐
+lems, and should not be used in new code.
+
+
+Instance Methods or Class Methods?
+Instance methods are one of the key features of object-oriented programming. That
+doesn’t mean, however, that you should shun class methods. In many cases, it is per‐
+fectly reasonable to define class methods.
+
+  NB: Remember that in Java, class methods are declared with the
+static keyword, and the terms static method and class
+method are used interchangeably
+
+For example, when working with the Circle class you might find that you often
+want to compute the area of a circle with a given radius but don’t want to bother
+creating a Circle object to represent that circle. In this case, a class method is more
+convenient:
+public static double area(double r) { return PI * r * r; }
+It is perfectly legal for a class to define more than one method with the same name,
+as long as the methods have different parameters. This version of the area()
+method is a class method, so it does not have an implicit this parameter and must
+have a parameter that specifies the radius of the circle. This parameter keeps it dis‐
+tinct from the instance method of the same name.
+As another example of the choice between instance methods and class methods,
+consider defining a method named bigger() that examines two Circle objects and
+returns whichever has the larger radius. We can write bigger() as an instance
+method as follows:
+// Compare the implicit "this" circle to the "that" circle passed
+// explicitly as an argument and return the bigger one.
+public Circle bigger(Circle that) {
+ if (this.r > that.r) return this;
+ else return that;
+}
+
+We can also implement bigger() as a class method as follows:
+// Compare circles a and b and return the one with the larger radius
+public static Circle bigger(Circle a, Circle b) {
+ if (a.r > b.r) return a;
+ else return b;
+}
+
+
+Given two Circle objects, x and y, we can use either the instance method or the
+class method to determine which is bigger. The invocation syntax differs signifi‐
+cantly for the two methods, however:
+// Instance method: also y.bigger(x)
+Circle biggest = x.bigger(y);
+Circle biggest = Circle.bigger(x, y); // Static method
+
+
+Both methods work well, and, from an object-oriented design standpoint, neither of
+these methods is “more correct” than the other. The instance method is more for‐
+mally object oriented, but its invocation syntax suffers from a kind of asymmetry. In
+a case like this, the choice between an instance method and a class method is simply
+a design decision. Depending on the circumstances, one or the other will likely be
+the more natural choice.
+
+A word about System.out.println()
+We’ve frequently encountered the method System.out.println()—it’s used to dis‐
+play output to the terminal window or console. We’ve never explained why this
+method has such a long, awkward name or what those two periods are doing in it.
+Now that you understand class and instance fields and class and instance methods,
+it is easier to understand what is going on: System is a class. It has a public class field
+named out. This field is an object of type java.io.PrintStream, and it has an
+instance method named println().
+We can use static imports to make this a bit shorter with import static
+java.lang.System.out;—this will enable us to refer to the printing method as
+out.println() but as this is an instance method, we cannot shorten it any further.
+
+
+Composition Versus Inheritance
+Inheritance is not the only technique at our disposal in object-oriented design.
+Objects can contain references to other objects, so a larger conceptual unit can be
+aggregated out of smaller component parts—this is known as composition. One
+important related technique is delegation, where an object of a particular type holds
+a reference to a secondary object of a compatible type, and forwards all operations
+to the secondary object. This is frequently done using interface types, as shown in
+this example where we model the employment structure of software companies:
+public interface Employee {
+ void work();
+}
+public class Programmer implements Employee {
+ public void work() { /* program computer */ }
+}
+public class Manager implements Employee {
+ private Employee report;
+ public Manager(Employee staff) {
+ report = staff;
+ }
+ public Employee setReport(Employee staff) {
+ report = staff;
+ }
+ public void work() {
+ report.work();
+ }
+}
+
+
+The Manager class is said to delegate the work() operation to their direct report, and
+no actual work is performed by the Manager object. Variations of this pattern
+involve some work being done in the delegating class, with only some calls being
+forwarded to the delegate object.
+Another useful, related technique is called the decorator pattern—this provides the
+capability to extend objects with new functionality, including at runtime. The slight
+overhead is some extra work needed at design time. Let’s look at an example of the
+decorator pattern as applied to modeling burritos for sale at a taqueria. To keep
+things simple, we’ve only modeled a single aspect to be decorated—the price of the
+burrito:
+// The basic interface for our burritos
+interface Burrito {
+ double getPrice();
+}
+// Concrete implementation—standard size burrito
+public class StandardBurrito implements Burrito {
+ private static final double BASE_PRICE = 5.99;
+ public double getPrice() {
+ return BASE_PRICE;
+ }
+}
+// Larger, super-size burrito
+public class SuperBurrito implements Burrito {
+ private static final double BASE_PRICE = 6.99;
+ public double getPrice() {
+ return BASE_PRICE;
+ }
+}
+
+
+These cover the basic burritos that can be offered—two different sizes, at different
+prices. Let’s enhance this by adding some optional extras—jalapeño chilies and gua‐
+camole. The key design point here is to use an abstract base class that all of the
+optional decorating components will subclass:
+/*
+ * This class is the Decorator for Burrito—it represents optional
+ * extras that the burrito may or may not have.
+ */
+public abstract class BurritoOptionalExtra implements Burrito {
+ private final Burrito burrito;
+ private final double price;
+ // This constructor is protected to protect against the default
+ // constructor and to prevent rogue client code from directly
+ // instantiating the base class.
+ protected BurritoOptionalExtra(Burrito toDecorate,double myPrice) {
+ burrito = toDecorate;
+ price = myPrice;
+ }
+ public final double getPrice() {
+ return (burrito.getPrice() + price);
+ }
+}
+
+
+
+NB: The combination of an abstract base, BurritoOptional
+Extra, and a protected constructor means that the only valid
+way to get a BurritoOptionalExtra is to construct an
+instance of one of the subclasses, as they have public construc‐
+tors (which also hide the setup of the price of the component
+from client code).
+Let’s test the implementation out:
+Burrito lunch = new Jalapeno(new Guacamole(new SuperBurrito()));
+// The overall cost of the burrito is the expected $8.09.
+System.out.println("Lunch cost: "+ lunch.getPrice());
+The decorator pattern is very widely used—not least in the JDK utility classes.
+
+
+
+Field Inheritance and Accessors
+Java offers multiple potential approaches to the design issue of the inheritance of
+state. The programmer can choose to mark fields as protected and allow them to
+be accessed directly by subclasses (including writing to them). Alternatively, we can
+provide accessor methods to read (and write, if desired) the actual object fields, while
+retaining encapsulation, and leaving the fields as private.
+Let’s revisit our earlier PlaneCircle example from the end of Chapter 9 and explic‐
+itly show the field inheritance:
+public class Circle {
+ // This is a generally useful constant, so we keep it public
+ public static final double PI = 3.14159;
+ protected double r; // State inheritance via a protected field
+ // A method to enforce the restriction on the radius
+ protected void checkRadius(double radius) {
+ if (radius < 0.0)
+ throw new IllegalArgumentException("radius may not < 0");
+ }
+ // The non-default constructor
+ public Circle(double r) {
+ checkRadius(r);
+ this.r = r;
+ }
+ // Public data accessor methods
+ public double getRadius() { return r; }
+ public void setRadius(double r) {
+ checkRadius(r);
+ this.r = r;
+ }
+ // Methods to operate on the instance field
+ public double area() { return PI * r * r; }
+ public double circumference() { return 2 * PI * r; }
+}
+public class PlaneCircle extends Circle {
+ // We automatically inherit the fields and methods of Circle,
+ // so we only have to put the new stuff here.
+ // New instance fields that store the center point of the circle
+ private final double cx, cy;
+ // A new constructor to initialize the new fields
+ // It uses a special syntax to invoke the Circle() constructor
+ public PlaneCircle(double r, double x, double y) {
+ super(r); // Invoke the constructor of the superclass
+ this.cx = x; // Initialize the instance field cx
+ this.cy = y; // Initialize the instance field cy
+ }
+ public double getCentreX() {
+ return cx;
+ }
+ public double getCentreY() {
+ return cy;
+ }
+ // The area() and circumference() methods are inherited from Circle
+ // A new instance method that checks whether a point is inside the
+ // circle Note that it uses the inherited instance field r
+ public boolean isInside(double x, double y) {
+ double dx = x - cx, dy = y - cy;
+ // Pythagorean theorem
+ double distance = Math.sqrt(dx*dx + dy*dy);
+ return (distance < r); // Returns true or false
+ }
+}
+Instead of the preceding code, we can rewrite PlaneCircle using accessor methods,
+like this:
+
+public class PlaneCircle extends Circle {
+ // Rest of class is the same as above The field r in
+ // the superclass Circle can be made private because
+ // we no longer access it directly here
+ // Note that we now use the accessor method getRadius()
+ public boolean isInside(double x, double y) {
+ double dx = x - cx, dy = y - cy; // Distance from center
+ double distance = Math.sqrt(dx*dx + dy*dy); // Pythagorean theorem
+ return (distance < getRadius());
+ }
+}
+
+
+It is therefore unfortunate that the protected keyword in Java allows access to fields
+(and methods) from both subclasses and classes in the same packages as the declar‐
+ing class. This, combined with the ability for anyone to write a class that belongs to
+any given package (except system packages), means that protected inheritance of
+state is potentially flawed in Java.
+
+For all of these reasons, it is usually better to use accessor methods (either public or
+protected) to provide access to state for subclasses—unless the inherited state is
+declared final, in which case protected inheritance of state is perfectly permissible.
+
+Singleton
+The singleton pattern is another well-known design pattern. It is intended to solve
+the design issue where only a single instance of a class is required or desired. Java
+provides a number of different possible ways to implement the singleton pattern. In
+our discussion, we will use a slightly more verbose form, that has the benefit of
+being very explicit in what needs to happen for a safe singleton:
+public class Singleton {
+ private final static Singleton instance = new Singleton();
+ private static boolean initialized = false;
+ // Constructor
+ private Singleton() {
+ super();
+}
+ private void init() {
+ /* Do initialization */
+ }
+ // This method should be the only way to get a reference
+ // to the instance
+ public static synchronized Singleton getInstance() {
+ if (initialized) return instance;
+ instance.init();
+ initialized = true;
+ return instance;
+ }
+}
+
+
+The crucial point is that for the singleton pattern to be effective, it must be impossi‐
+ble to create more than one of them, and it must be impossible to get a reference to
+the object in an uninitialized state To achieve this, we require a private constructor, which is only called
+once. In our version of Singleton, we only call the constructor when we initialize
+the private static variable instance. We also separate out the creation of the only
+Singleton object from its initialization—which occurs in the private method
+init().
+
+With this mechanism in place, the only way to get a reference to the lone instance of
+Singleton is via the static helper method, getInstance(). This method checks the
+flag initialized to see if the object is already in an active state. If it is, then a refer‐
+ence to the singleton object is returned. If not, then getInstance() calls init() to
+activate the object, and flicks the flag to true, so that next time a reference to the
+Singleton is requested, further initialization will not occur
+
+
+The singleton pattern has some drawbacks—in particular, it can be hard to test and
+to separate out from other classes. It also requires care when used in mulithreaded
+code. Nevertheless, it is important that developers are familiar with, and do not
+accidentally reinvent it. The singleton pattern is often used in configuration man‐
+agement, but modern code will typically use a framework (often a dependency injection) to provide the programmer with singletons automatically, rather than via
+an explicit Singleton (or equivalent) class.
+
+
+
+
+Exceptions and Exception Handling
+
+Recall that an exception in Java is an object. The type of this object is
+java.lang.Throwable, or more commonly, some subclass of Throwable that more
+specifically describes the type of exception that occurred. Throwable has two stan‐
+dard subclasses: java.lang.Error and java.lang.Exception. Exceptions that are
+subclasses of Error generally indicate unrecoverable problems: the virtual machine
+has run out of memory, or a class file is corrupted and cannot be read, for example.
+Exceptions of this sort can be caught and handled, but it is rare to do so—these are
+the unchecked exceptions previously mentioned.
+Exceptions that are subclasses of Exception, on the other hand, indicate less severe
+conditions. These exceptions can be reasonably caught and handled. They include
+such exceptions as java.io.EOFException, which signals the end of a file, and
+java.lang.ArrayIndexOutOfBoundsException, which indicates that a program has
+tried to read past the end of an array. These are the checked exceptions from Chap‐
+ter 2 (except for subclasses of RuntimeException, which are also a form of
+unchecked exception). 
+
+Because an exception is an object, it can contain data, and its class can define meth‐
+ods that operate on that data. The Throwable class and all its subclasses include a
+String field that stores a human-readable error message that describes the excep‐
+tional condition. It’s set when the exception object is created and can be read from
+the exception with the getMessage() method. Most exceptions contain only this
+single message, but a few add other data. The java.io.InterruptedIOException,
+for example, adds a field named bytesTransferred that specifies how much input
+or output was completed before the exceptional condition interrupted it.
+When designing your own exceptions, you should consider what other additional
+modeling information is relevant to the exception object. This is usually situationspecific information about the aborted operation, and the exceptional circumstance
+that was encountered (as we saw with java.io.InterruptedIOException).
+There are some trade-offs in the use of exceptions in application design. Using
+checked exceptions means that the compiler can enforce the handling (or propaga‐
+tion up the call stack) of known conditions that have the potential of recovery or
+retry. It also means that it’s more difficult to forget to actually handle errors—thus
+reducing the risk that a forgotten error condition causes a system to fail in
+production.
+
+
+On the other hand, some applications will not be able to recover from certain con‐
+ditions—even conditions that are theoretically modelled by checked exceptions. For
+example, if an application requires a config file to be placed at a specific place in the
+filesystem and is unable to locate it at startup, there may be very little it can do
+except print an error message and exit—despite the fact that java.io.FileNotFoun
+dException is a checked exception. Forcing exceptions that cannot be recovered
+from to be either handled or propagated is, in these circumstances, bordering on
+perverse.
+When designing exception schemes, there are some good practices that you should
+follow:
+
+On the other hand, some applications will not be able to recover from certain con‐
+ditions—even conditions that are theoretically modelled by checked exceptions. For
+example, if an application requires a config file to be placed at a specific place in the
+filesystem and is unable to locate it at startup, there may be very little it can do
+except print an error message and exit—despite the fact that java.io.FileNotFoun
+dException is a checked exception. Forcing exceptions that cannot be recovered
+from to be either handled or propagated is, in these circumstances, bordering on
+perverse.
+When designing exception schemes, there are some good practices that you should
+follow:
+
+// Never just swallow an exception
+try {
+ someMethodThatMightThrow();
+} catch(Exception e){
+}
+// Never catch, log and rethrow an exception
+try {
+ someMethodThatMightThrow();
+} catch(SpecificException e){
+ log(e);
+ throw e;
+}
+
+The former of these two just ignores a condition that almost certainly required
+some action (even if just a notification in a log). This increases the likelihood of fail‐
+ure elsewhere in the system—potentially far from the original, real source.
+The second one just creates noise—we’re logging a message but not actually doing
+anything about the issue—we still require some other code higher up in the system
+to actually deal with the problem.
+
+
+Safe Java Programming
+Programming languages are sometimes described as being type safe—however, this
+term is used rather loosely by working programmers. There are a number of differ‐
+ent viewpoints and definitions when discussing type safety, not all of which are
+mutually compatible. The most useful view for our purposes is that type safety is the
+property of a programming language that prevents the type of data being incorrectly
+identified at runtime. This should be thought of as a sliding scale—it is more helpful
+to think of languages as being more (or less) type safe than each other, rather than a
+simple binary property of safe / unsafe.
+In Java, the static nature of the type system helps prevent a large class of possible
+errors, by producing compilation errors if, for example, the programmer attempts
+to assign an incompatible value to a variable. However, Java is not perfectly type
+safe, as we can perform a cast between any two reference types—this will fail at run‐
+time with a ClassCastException if the value is not compatible.
+
+
+s. This means that we should think in terms of programs, rather than lan‐
+guages. This emphasizes the point that safe code is not guaranteed by any widely
+used language, and instead considerable programmer effort (and adherence to rig‐
+orous coding discipline) must be employed if the end result is to be truly safe and
+correct.
+
+We approach our view of safe programs by working with the state model abstraction
+as shown in Figure 5-1. A safe program is one in which:
+• All objects start off in a legal state after creation
+• Externally accessible methods transition objects between legal states
+• Externally accessible methods must not return with object in an inconsistent
+state
+• Externally accessible methods must reset object to a legal state before throwing
+
+
+In this context, “externally accessible” means public, package-private, or pro
+tected. This defines a reasonable model for safety of programs, and as it is bound
+up with defining our abstract types in such a way that their methods ensure consis‐
+tency of state, it’s reasonable to refer to a program satisfying these requirements as a
+“safe program,” regardless of the language in which such a program is implemented.
+
+NB: Private methods do not have to start or end with object in a
+legal state, as they cannot be called by an external piece of
+code
+
+As you might imagine, actually engineering a substantial piece of code so that we
+can be sure that the state model and methods respect these properties, can be quite
+an undertaking. In languages such as Java, in which programmers have direct con‐
+trol over the creation of preemptively multitasked execution threads, this problem is
+a great deal worse.
